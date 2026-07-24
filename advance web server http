@@ -1,0 +1,93 @@
+#include "SSD1306.h"
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+#include <ESP8266mDNS.h>
+
+// ---------------- OLED ----------------
+SSD1306 display(0x3C, 4, 5);
+
+// ---------------- WiFi ----------------
+const char* ssid = "M2M";
+const char* password = "12345678";
+
+// ---------------- Web Server ----------------
+ESP8266WebServer server(80);
+
+void Handle_Root();
+void LED();
+
+void setup()
+{
+    // OLED
+    display.init();
+    display.clear();
+    display.flipScreenVertically();
+    display.setFont(ArialMT_Plain_10);
+    display.setTextAlignment(TEXT_ALIGN_LEFT);
+
+    // GPIO
+    pinMode(2, OUTPUT);
+    digitalWrite(2, HIGH);
+
+    pinMode(16, OUTPUT);
+    digitalWrite(16, HIGH);
+
+    // Serial
+    Serial.begin(115200);
+
+    // WiFi
+    WiFi.begin(ssid, password);
+
+    while (WiFi.status() != WL_CONNECTED)
+    {
+        digitalWrite(2, LOW);
+        delay(250);
+
+        Serial.print(".");
+
+        digitalWrite(2, HIGH);
+        delay(250);
+    }
+
+    String IP = WiFi.localIP().toString();
+
+    display.drawString(0, 0, "IP Address:");
+    display.drawString(0, 15, IP);
+    display.display();
+
+    // Register URLs
+    server.on("/", Handle_Root);
+    server.on("/LED", LED);
+
+    server.begin();
+
+    Serial.println("HTTP Server Started");
+}
+
+void loop()
+{
+    server.handleClient();
+}
+
+void Handle_Root()
+{
+    server.send(200, "text/plain", "Hello this is on and off LED");
+}
+
+void LED()
+{
+    if (server.arg("led1") == "on")
+        digitalWrite(2, LOW);
+
+    if (server.arg("led1") == "off")
+        digitalWrite(2, HIGH);
+
+    if (server.arg("led2") == "on")
+        digitalWrite(16, LOW);
+
+    if (server.arg("led2") == "off")
+        digitalWrite(16, HIGH);
+
+    //server.send(200, "text/plain", "LED Updated");
+	server.send(204,"LED Updated");
+}
