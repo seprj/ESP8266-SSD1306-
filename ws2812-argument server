@@ -1,0 +1,131 @@
+#include "SSD1306.h"
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+#include <ESP8266mDNS.h>
+#include <Adafruit_NeoPixel.h>
+
+//---------------- OLED ----------------
+SSD1306 display(0x3C, 4, 5);
+
+//---------------- NeoPixel ----------------
+#define PIN 14          // پایه DATA نوار LED
+#define NUM_LEDS 2      // تعداد LEDها
+
+Adafruit_NeoPixel strip(NUM_LEDS, PIN, NEO_GRB + NEO_KHZ800);
+
+//---------------- WiFi ----------------
+const char* ssid = "M2M";
+const char* password = "12345678";
+
+//---------------- Web Server ----------------
+ESP8266WebServer server(80);
+
+// معرفی توابع
+void Handle_Root();
+void LED();
+
+void setup()
+{ 
+    // راه‌اندازی NeoPixel
+    strip.begin();
+    strip.clear();
+    strip.show();
+
+    // راه‌اندازی OLED
+    display.init();
+    display.clear();
+    display.flipScreenVertically();
+    display.setFont(ArialMT_Plain_10);
+    display.setTextAlignment(TEXT_ALIGN_LEFT);
+
+    // پایه‌ها
+    pinMode(2, OUTPUT);
+    digitalWrite(2, HIGH);
+
+    pinMode(16, OUTPUT);
+    digitalWrite(16, HIGH);
+
+    // سریال
+    Serial.begin(115200);
+
+    // اتصال WiFi
+    WiFi.begin(ssid, password);
+
+    while (WiFi.status() != WL_CONNECTED)
+    {
+        digitalWrite(2, LOW);
+        delay(250);
+
+        Serial.print(".");
+
+        digitalWrite(2, HIGH);
+        delay(250);
+    }
+
+    // نمایش IP
+    String IP = WiFi.localIP().toString();
+
+    display.drawString(0,0,"IP Address:");
+    display.drawString(0,15,IP);
+    display.display();
+
+    // ثبت آدرس‌ها
+    server.on("/", Handle_Root);
+    server.on("/RGB", Handle_RGB );
+
+    // شروع سرور
+    server.begin();
+
+    Serial.println("HTTP Server Started");
+}
+
+void loop()
+{
+    server.handleClient();
+}
+
+//---------------- صفحه اصلی ----------------
+void Handle_Root()
+{
+    server.send(200,"text/plain","ESP8266 Web Server");
+}
+
+//---------------- کنترل LED ----------------
+ 
+void  Handle_RGB(){   
+	string RED =server.arg("Red");
+	string Green =server.arg("Green");
+        string Blue =server.arg("Blue");
+	string Pixel_Number= server.arg("Pixel_Number");
+	 
+	string All =server.arg("All");
+	if (All == "on"){
+	    for(unint16_t i=0;i<NUM_LEDS;i++){
+	     strip.setpixelColor(Pixel_Number.toInt,RED.toInt(),GREEN.toInt(),BLUE.toInt());
+		strip.show();
+		delay(1);
+
+		}
+	}
+	 display.clear();
+	 display.drawString(0,0,"Red: ",+RED);
+	 display.drawString(0,17,"Green: ",+Green);
+	 display.drawString(0,33,"Blue: ",+Blue);
+	 display.drawString(0,48,"All Pixels");
+	  display.display();
+	else{
+ 	    strip.setpixelColor(Pixel_Number.toInt,RED.toInt(),GREEN.toInt(),BLUE.toInt());
+		
+      	   strip.show();}
+
+
+
+	//strip.setpixelColor(0,0,255,0);
+	
+
+
+}
+   
+
+    server.send(204,"Command Executed");
+} 
