@@ -1,0 +1,361 @@
+#include <FS.h>                 // کتابخانه سیستم فایل SPIFFS
+#include <ESP8266WiFi.h>        // کتابخانه WiFi
+
+char filename[] = "/itpro.txt"; // نام فایل داخل SPIFFS
+
+String command = "";            // دستور دریافتی از سریال
+
+char ssid[30];                  // آرایه برای نگهداری SSID
+char presharedkey[50];          // آرایه برای نگهداری رمز وای‌فای
+
+String SSID_File;               // SSID خوانده شده از فایل
+String preshared_File;          // رمز خوانده شده از فایل
+
+File myFile;                    // شیء مربوط به فایل
+
+//======================================================
+// تابع Setup
+//======================================================
+
+void setup() {
+
+  WiFi.disconnect();            // اگر قبلاً به WiFi متصل بوده، اتصال را قطع کن
+
+  Serial.begin(115200);         // راه‌اندازی ارتباط سریال
+
+  Serial.println(" ");          // چاپ یک خط خالی
+
+  SPIFFS.begin();               // راه‌اندازی (Mount) فایل سیستم SPIFFS
+
+  read_wifi_config();           // خواندن تنظیمات WiFi از فایل‌ها و اتصال به شبکه
+
+  Serial.println(" ");
+
+  Serial.println("Ready for Commands append,read,write,format,list,wifi config");
+  // اعلام آمادگی برای دریافت دستورات از Serial Monitor
+}
+
+//======================================================
+// حلقه اصلی برنامه
+//======================================================
+
+void loop() {
+
+  // اگر داده‌ای از طریق UART دریافت شد
+  if (Serial.available()) {
+
+    // کل رشته ارسال شده را بخوان
+    command = Serial.readString();
+
+    // اگر دستور write بود
+    if (command == "write")
+      write_SPIFFS();
+
+    // اگر دستور read بود
+    if (command == "read")
+      read_SPIFFS();
+
+    // اگر دستور remove بود
+    if (command == "remove")
+      remove_SPIFFS();
+
+    // اگر دستور format بود
+    if (command == "format")
+      format_SPIFFS();
+
+    // اگر دستور append بود
+    if (command == "append")
+      append_SPIFFS();
+
+    // اگر دستور list بود
+    if (command == "list")
+      List_SPIFFS();
+
+    // اگر دستور wifi config بود
+    if (command == "wifi config")
+      wifi_config();
+  }
+}
+
+//======================================================
+// خواندن فایل از SPIFFS
+//======================================================
+
+void read_SPIFFS() {
+
+  myFile = SPIFFS.open(filename, "r");      // فایل را در حالت خواندن (Read) باز کن
+
+  if (!myFile)                              // اگر فایل باز نشد
+    Serial.println("file open failed");     // پیام خطا چاپ کن
+
+  while (myFile.available()) {              // تا زمانی که هنوز داده داخل فایل وجود دارد
+
+    Serial.write(myFile.read());            // یک کاراکتر از فایل بخوان و روی سریال چاپ کن
+
+  }
+
+  myFile.close();                           // فایل را ببند
+}
+
+//======================================================
+// ایجاد فایل و نوشتن داخل آن
+//======================================================
+
+void write_SPIFFS() {
+
+  myFile = SPIFFS.open(filename, "w");      // فایل را در حالت Write باز کن (اگر وجود داشته باشد پاک می‌شود)
+
+  myFile.println("ITpro.ir IOT Lesson 19 Behrooz Sirouszad"); // نوشتن خط اول
+
+  myFile.println("IOT Boot Camp");          // نوشتن خط دوم
+
+  myFile.println("www.telegram.me/Sirouszad"); // نوشتن خط سوم
+
+  myFile.println(millis());                 // نوشتن زمان سپری شده از روشن شدن ESP
+
+  myFile.close();                           // بستن فایل
+
+  Serial.println("File is Written");        // اعلام پایان نوشتن
+}
+
+//======================================================
+// حذف فایل
+//======================================================
+
+void remove_SPIFFS() {
+
+  if (SPIFFS.exists(filename)) {            // اگر فایل وجود داشت
+
+    SPIFFS.remove(filename);                // فایل را حذف کن
+
+    Serial.print(filename);                 // نام فایل را چاپ کن
+
+    Serial.println(" Removed Successfully");// اعلام حذف موفق
+
+  } else {
+
+    Serial.println(filename);               // نام فایل
+
+    Serial.println(" Does not exist");      // فایل وجود ندارد
+
+  }
+}
+
+//======================================================
+// اضافه کردن اطلاعات به انتهای فایل
+//======================================================
+
+void append_SPIFFS() {
+
+  myFile = SPIFFS.open(filename, "a");      // فایل را در حالت Append باز کن
+
+  myFile.println("ITpro.ir IOT Lesson 19 Behrooz Sirouszad");
+
+  myFile.println("IOT Boot Camp");
+
+  myFile.println("www.telegram.me/Sirouszad");
+
+  myFile.println(millis());
+
+  myFile.close();                           // بستن فایل
+
+  Serial.println("File is appended");       // پایان عملیات
+}
+
+//======================================================
+// فرمت کردن SPIFFS
+//======================================================
+
+void format_SPIFFS() {
+
+  Serial.println("Formatting SPIFFS please Wait ....");
+
+  if (SPIFFS.format())                      // اگر فرمت با موفقیت انجام شد
+
+    Serial.println("SPIFFS is Formatted");
+
+}
+
+//======================================================
+// نمایش لیست فایل‌ها
+//======================================================
+
+void List_SPIFFS() {
+
+  String str = "";                          // رشته‌ای برای ذخیره خروجی
+
+  Dir dir = SPIFFS.openDir("");             // باز کردن ریشه فایل سیستم
+
+  while (dir.next()) {                      // تا زمانی که فایل بعدی وجود دارد
+
+    str += dir.fileName();                  // نام فایل
+
+    str += " Size : ";
+
+    str += dir.fileSize();                  // اندازه فایل
+
+    str += "\r\n";
+
+  }
+
+  Serial.print(str);                        // چاپ لیست فایل‌ها
+
+}
+
+//======================================================
+// ذخیره تنظیمات WiFi داخل فایل
+//======================================================
+
+void wifi_config() {
+
+  scan_wifi();                              // ابتدا شبکه‌های اطراف را اسکن کن
+
+  Serial.println("Enter SSID : ");
+
+  while (!Serial.available()) {}            // منتظر ورود SSID
+
+  SSID_File = Serial.readString();          // خواندن نام شبکه
+
+  Serial.println("Enter pre shared key : ");
+
+  while (!Serial.available()) {}            // منتظر ورود رمز
+
+  preshared_File = Serial.readString();     // خواندن رمز
+
+  myFile = SPIFFS.open("/SSID.txt", "w");   // ساخت فایل SSID
+
+  myFile.print(SSID_File);                  // ذخیره SSID
+
+  myFile.close();
+
+  myFile = SPIFFS.open("/wifipass.txt", "w"); // ساخت فایل رمز
+
+  myFile.print(preshared_File);             // ذخیره رمز
+
+  myFile.close();
+
+  ESP.restart();                            // ریستارت ESP تا تنظیمات جدید اعمال شوند
+
+}
+
+//======================================================
+// اسکن شبکه‌های WiFi
+//======================================================
+
+void scan_wifi() {
+
+  Serial.println("scan start");
+
+  int n = WiFi.scanNetworks();              // جستجوی شبکه‌های اطراف
+
+  Serial.println("scan done");
+
+  if (n == 0)
+
+    Serial.println("no networks found");
+
+  else {
+
+    Serial.print(n);                        // تعداد شبکه‌ها
+
+    Serial.println(" networks found");
+
+    for (int i = 0; i < n; i++) {
+
+      Serial.print(i + 1);                  // شماره شبکه
+
+      Serial.print(": ");
+
+      Serial.print(WiFi.SSID(i));           // نام شبکه
+
+      Serial.print(" (");
+
+      Serial.print(WiFi.RSSI(i));           // قدرت سیگنال
+
+      Serial.print(")");
+
+      // اگر رمز نداشته باشد فاصله چاپ می‌کند، در غیر این صورت *
+      Serial.println((WiFi.encryptionType(i) == ENC_TYPE_NONE) ? " " : "*");
+
+      delay(10);
+
+    }
+
+  }
+
+}
+
+//======================================================
+// خواندن تنظیمات WiFi از فایل
+//======================================================
+
+void read_wifi_config() {
+
+  myFile = SPIFFS.open("/SSID.txt", "r");   // باز کردن فایل SSID
+
+  if (!myFile) {
+
+    Serial.println("No SSID Config file found Please type (wifi config)");
+
+    return;                                // اگر فایل نبود از تابع خارج شو
+
+  } else {
+
+    SSID_File = myFile.readString();        // خواندن SSID
+
+    myFile.close();
+
+  }
+
+  myFile = SPIFFS.open("/wifipass.txt", "r"); // باز کردن فایل رمز
+
+  if (!myFile) {
+
+    Serial.println("No wifi password Config file found Please type (wifi config)");
+
+  } else {
+
+    preshared_File = myFile.readString();   // خواندن رمز
+
+    myFile.close();
+
+  }
+
+  // تبدیل String به آرایه char
+  SSID_File.toCharArray(ssid, sizeof(ssid));
+
+  preshared_File.toCharArray(presharedkey, sizeof(presharedkey));
+
+  Serial.println("connecting to :");
+
+  Serial.println(ssid);
+
+  Serial.println(presharedkey);
+
+  WiFi.begin(ssid, presharedkey);           // اتصال به مودم
+
+  uint8_t i = 0;
+
+  while (WiFi.status() != WL_CONNECTED && i++ < 30) {
+
+    delay(500);                             // هر نیم ثانیه وضعیت اتصال را بررسی کن
+
+    Serial.print(".");
+
+  }
+
+  if (i == 31) {
+
+    Serial.print("Could not connect to ");
+
+    Serial.println(ssid);
+
+    return;
+
+  }
+
+  Serial.print("Connected! IP address : ");
+
+  Serial.println(WiFi.localIP());           // چاپ IP دریافت شده
+
+}
