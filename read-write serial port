@@ -1,0 +1,174 @@
+#include <EEPROM.h>          // فراخوانی کتابخانه EEPROM
+
+//====================== متغیرهای سراسری ======================
+
+int IP1;                     // بخش اول IP (۴ بایت)
+int IP2;                     // بخش دوم IP (۴ بایت)
+int IP3;                     // بخش سوم IP (۴ بایت)
+int IP4;                     // بخش چهارم IP (۴ بایت)
+
+int subnet1;                 // عدد ساب‌نت (۴ بایت)
+
+String Text1;                // متن اول
+String Text2;                // متن دوم
+
+String EEText1;              // برای خواندن متن اول از EEPROM
+String EEText2;              // برای خواندن متن دوم از EEPROM
+
+String Data;                 // دستور دریافتی از سریال (read, write, erase)
+
+//====================== Setup ======================
+
+void setup() {
+
+  Serial.begin(115200);      // راه‌اندازی UART با BaudRate=115200
+
+  EEPROM.begin(4096);        // ایجاد EEPROM مجازی با اندازه 4096 بایت روی Flash
+
+  Serial.println(" ");       // چاپ یک خط خالی
+
+  Serial.println("Ready for Commands erase,read,write");
+  // اعلام آمادگی برای دریافت دستورات
+}
+
+//====================== Loop ======================
+
+void loop() {
+
+  if (Serial.available()) {          // اگر داده‌ای از سریال رسید
+
+    Data = Serial.readString();      // کل رشته را بخوان
+
+    if (Data == "write")             // اگر دستور write بود
+      write_EEPROM();                // تابع نوشتن اجرا شود
+
+    if (Data == "read")              // اگر دستور read بود
+      read_EEPROM();                 // تابع خواندن اجرا شود
+
+    if (Data == "erase")             // اگر دستور erase بود
+      erase_EEPROM();                // تابع پاک کردن اجرا شود
+  }
+}
+
+//====================== خواندن EEPROM ======================
+
+void read_EEPROM() {
+
+  Serial.println(" ");
+
+  Serial.println("Now Reading From EEPROM");
+
+  Serial.print("EEPROM Address 0 : ");
+  Serial.println(EEPROM.read(0));      // خواندن آدرس 0
+
+  Serial.print("EEPROM Address 4 : ");
+  Serial.println(EEPROM.read(4));      // خواندن آدرس 4
+
+  Serial.print("EEPROM Address 8 : ");
+  Serial.println(EEPROM.read(8));      // خواندن آدرس 8
+
+  Serial.print("EEPROM Address 12 : ");
+  Serial.println(EEPROM.read(12));     // خواندن آدرس 12
+
+  Serial.print("EEPROM Address 16 : ");
+  EEPROM.get(16, EEText1);             // خواندن Text1
+  Serial.println(EEText1);
+
+  Serial.print("EEPROM Address 28 : ");
+  EEPROM.get(28, EEText2);             // خواندن Text2
+  Serial.println(EEText2);
+
+  Serial.print("EEPROM Address 40 : ");
+  Serial.println(EEPROM.read(40));     // خواندن subnet
+
+  Serial.println("Reading From EEPROM Finished");
+
+  delay(2000);
+}
+
+//====================== نوشتن EEPROM ======================
+
+void write_EEPROM() {
+
+  Serial.println("Type Digit EEPROM Address 0 :");
+
+  while (!Serial.available()) {}       // صبر تا کاربر عدد وارد کند
+
+  IP1 = Serial.readString().toInt();   // خواندن عدد و تبدیل به int
+
+  Serial.println("Type Digit EEPROM Address 4 :");
+
+  while (!Serial.available()) {}
+
+  IP2 = Serial.readString().toInt();
+
+  Serial.println("Type Digit EEPROM Address 8 :");
+
+  while (!Serial.available()) {}
+
+  IP3 = Serial.readString().toInt();
+
+  Serial.println("Type Digit EEPROM Address 12 :");
+
+  while (!Serial.available()) {}
+
+  IP4 = Serial.readString().toInt();
+
+  Serial.println("Type Text EEPROM Address 16 :");
+
+  while (!Serial.available()) {}
+
+  Text1 = Serial.readString();         // دریافت متن اول
+
+  Serial.println("Type Text EEPROM Address 28 :");
+
+  while (!Serial.available()) {}
+
+  Text2 = Serial.readString();         // دریافت متن دوم
+
+  Serial.println("Type Digit EEPROM Address 40 :");
+
+  while (!Serial.available()) {}
+
+  subnet1 = Serial.readString().toInt();
+
+  Serial.println(" ");
+
+  Serial.println("Now Writing To EEPROM");
+
+  EEPROM.put(0, IP1);          // ذخیره IP1 در آدرس 0
+  EEPROM.put(4, IP2);          // ذخیره IP2 در آدرس 4
+  EEPROM.put(8, IP3);          // ذخیره IP3 در آدرس 8
+  EEPROM.put(12, IP4);         // ذخیره IP4 در آدرس 12
+
+  EEPROM.put(16, Text1);       // ذخیره متن اول از آدرس 16
+
+  EEPROM.put(28, Text2);       // ذخیره متن دوم از آدرس 28
+
+  EEPROM.put(40, subnet1);     // ذخیره subnet از آدرس 40
+
+  EEPROM.commit();             // انتقال اطلاعات از RAM به Flash
+
+  Serial.println("Writing To EEPROM Finished");
+
+  delay(2000);
+}
+
+//====================== پاک کردن EEPROM ======================
+
+void erase_EEPROM() {
+
+  Serial.println(" ");
+
+  Serial.println("Erase All EEPROM With 0");
+
+  for (int i = 0; i < 4096; i++) {   // از آدرس 0 تا 4095
+    EEPROM.write(i, 0);              // مقدار صفر بنویس
+  }
+
+  EEPROM.commit();                   // ذخیره تغییرات روی Flash
+
+  Serial.println("EEPROM Erasing Finished");
+
+  delay(2000);
+}
