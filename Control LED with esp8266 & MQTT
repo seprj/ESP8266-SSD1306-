@@ -1,0 +1,225 @@
+#include <ESP8266WiFi.h>          // کتابخانه WiFi مخصوص ESP8266 برای اتصال به شبکه بی‌سیم
+#include <PubSubClient.h>         // کتابخانه MQTT برای ارسال و دریافت پیام
+
+#define LED D1                    // یک نام ثابت به اسم LED تعریف می‌کند که همان پایه D1 است
+
+bool ledState = false;            // یک متغیر بولی برای نگهداری وضعیت LED (خاموش = false، روشن = true)
+
+
+//===================== تنظیمات WiFi =====================
+
+const char* ssid = "YOUR_WIFI";       // نام شبکه وای‌فای که ESP8266 باید به آن وصل شود
+const char* password = "YOUR_PASSWORD"; // رمز عبور شبکه وای‌فای
+
+
+//===================== تنظیمات MQTT =====================
+
+// آدرس بروکر MQTT عمومی HiveMQ
+const char* mqtt_broker = "broker.hivemq.com";
+
+// شماره پورت MQTT
+// تقریباً تمام Broker های MQTT از پورت 1883 استفاده می‌کنند.
+const int mqtt_port = 1883;
+
+
+// تاپیکی که قرار است ESP8266 روی آن پیام دریافت و ارسال کند
+const char* mqtt_topic = "itpro/esp8266/led";
+
+
+//===================== ساخت اشیاء =====================
+
+// ایجاد یک Client برای ارتباط TCP با اینترنت
+WiFiClient espClient;
+
+// ساخت شیء MQTT
+// این شیء از espClient برای ارتباط با Broker استفاده می‌کند.
+PubSubClient mqtt_client(espClient);
+
+
+
+//=======================================================
+// تابع اتصال به WiFi
+//=======================================================
+
+void connectToWiFi() {
+
+  WiFi.begin(ssid, password);
+  // شروع اتصال به شبکه وای‌فای
+  // ssid و password که بالا تعریف کردیم اینجا استفاده می‌شوند.
+
+  Serial.print("Connecting to WiFi");
+  // روی Serial Monitor پیام نمایش می‌دهد.
+
+  while (WiFi.status() != WL_CONNECTED) {
+    // تا زمانی که هنوز وصل نشده...
+
+    delay(500);
+    // نیم ثانیه صبر کن
+
+    Serial.print(".");
+    // هر نیم ثانیه یک نقطه چاپ کن تا کاربر بفهمد در حال اتصال است.
+  }
+
+  Serial.println("\nWiFi Connected");
+  // وقتی وصل شد این پیام چاپ می‌شود.
+}
+
+
+
+//=======================================================
+// تابع Callback
+// این تابع هر وقت یک پیام MQTT برسد به صورت خودکار اجرا می‌شود.
+//=======================================================
+
+void mqttCallback(char *topic, byte *payload, unsigned int length) {
+
+  // topic ---> نام تاپیکی که پیام روی آن آمده
+  // payload ---> متن پیام به صورت آرایه بایت
+  // length ---> طول پیام
+
+  String message = "";
+  // یک رشته خالی می‌سازد تا متن پیام داخل آن ذخیره شود.
+
+
+  for (int i = 0; i < length; i++)
+    message += (char)payload[i];
+  // چون payload آرایه‌ای از byte است،
+  // یکی یکی آن‌ها را به char تبدیل می‌کند
+  // و در نهایت رشته کامل را داخل message می‌ریزد.
+
+
+  Serial.print("Message: ");
+  // چاپ عبارت Message
+
+  Serial.println(message);
+  // چاپ متن پیام دریافتی
+
+
+  if (message == "on") {
+    // اگر متن پیام برابر "on" بود
+
+    digitalWrite(LED, HIGH);
+    // پایه D1 را HIGH می‌کند.
+    // اگر LED معمولی وصل باشد روشن می‌شود.
+
+    ledState = true;
+    // وضعیت LED را روشن ذخیره می‌کند.
+  }
+
+
+  if (message == "off") {
+    // اگر پیام "off" بود
+
+    digitalWrite(LED, LOW);
+    // LED خاموش می‌شود.
+
+    ledState = false;
+    // وضعیت LED را خاموش ذخیره می‌کند.
+  }
+}
+
+
+
+//=======================================================
+// اتصال به Broker
+//=======================================================
+
+void connectToMQTTBroker() {
+
+  while (!mqtt_client.connected()) {
+    // تا وقتی به Broker وصل نشده‌ایم...
+
+    String clientID = "ESP8266-";
+    // ابتدای شناسه کلاینت
+
+    clientID += String(ESP.getChipId());
+    // شماره سخت‌افزاری ESP را به انتهای آن اضافه می‌کند.
+    // مثلاً:
+    // ESP8266-9845212
+
+    Serial.print("Connecting to HiveMQ...");
+
+    if (mqtt_client.connect(clientID.c_str())) {
+      // تلاش برای اتصال به Broker
+
+      Serial.println("Connected");
+      // اگر موفق شد...
+
+      mqtt_client.subscribe(mqtt_topic);
+      // عضو تاپیک می‌شود.
+      // یعنی از این به بعد هر پیامی روی این تاپیک بیاید دریافت می‌کند.
+
+      mqtt_client.publish(mqtt_topic, "ESP8266 Connected");
+      // بعد از اتصال یک پیام ارسال می‌کند
+      // تا بقیه کلاینت‌ها بفهمند ESP آنلاین شده است.
+    }
+    else {
+
+      Serial.print("Failed, rc=");
+      // اگر اتصال شکست بخورد
+
+      Serial.println(mqtt_client.state());
+      // کد خطا را چاپ می‌کند.
+      // مثلاً:
+      // -2
+      // -4
+      // و ...
+
+      delay(5000);
+      // پنج ثانیه صبر می‌کند
+      // سپس دوباره تلاش می‌کند.
+    }
+  }
+}
+
+
+
+//=======================================================
+// setup()
+// فقط یک بار بعد از روشن شدن اجرا می‌شود.
+//=======================================================
+
+void setup() {
+
+  pinMode(LED, OUTPUT);
+  // پایه D1 خروجی می‌شود.
+
+  Serial.begin(115200);
+  // راه‌اندازی Serial Monitor
+
+  connectToWiFi();
+  // اتصال به وای‌فای
+
+  mqtt_client.setServer(mqtt_broker, mqtt_port);
+  // مشخص کردن آدرس Broker و شماره پورت
+
+  mqtt_client.setCallback(mqttCallback);
+  // مشخص کردن تابعی که هنگام دریافت پیام اجرا شود.
+
+  connectToMQTTBroker();
+  // اتصال به Broker
+}
+
+
+
+//=======================================================
+// loop()
+// این تابع دائماً تکرار می‌شود.
+//=======================================================
+
+void loop() {
+
+  if (!mqtt_client.connected())
+    // اگر ارتباط با Broker قطع شده باشد...
+
+    connectToMQTTBroker();
+    // دوباره وصل شو.
+
+  mqtt_client.loop();
+  // بسیار مهم
+  // این تابع دائماً بررسی می‌کند:
+  // آیا پیام جدیدی آمده؟
+  // آیا باید پاسخ Broker داده شود؟
+  // آیا ارتباط هنوز برقرار است؟
+  // اگر این خط حذف شود ESP دیگر هیچ پیام MQTT دریافت نخواهد کرد.
+}
