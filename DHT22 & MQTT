@@ -1,0 +1,67 @@
+// ESP8266 + HiveMQ + DHT22 + OLED template
+#include <ESP8266WiFi.h>
+#include <PubSubClient.h>
+#include <DHT.h>
+#include <Wire.h>
+#include "SSD1306.h"
+
+#define DHTPIN 10
+#define DHTTYPE DHT22
+#define LED_PIN 16
+#define MOTION_PIN 14
+
+const char* ssid="YOUR_WIFI";
+const char* password="YOUR_PASSWORD";
+const char* mqtt_server="broker.hivemq.com";
+const int mqtt_port=1883;
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+DHT dht(DHTPIN,DHTTYPE);
+SSD1306 display(0x3c,4,5);
+
+void callback(char* topic, byte* payload, unsigned int length){
+  String msg="";
+  for(unsigned int i=0;i<length;i++) msg+=(char)payload[i];
+  if(String(topic)=="itpro/led"){
+    digitalWrite(LED_PIN, msg=="ON"?LOW:HIGH);
+  }
+}
+void reconnect(){
+  while(!client.connected()){
+    if(client.connect("ESP8266Client")){
+      client.subscribe("itpro/led");
+    }else delay(2000);
+  }
+}
+void setup(){
+ Serial.begin(115200);
+ pinMode(LED_PIN,OUTPUT);
+ pinMode(MOTION_PIN,INPUT);
+ dht.begin();
+ display.init();
+ display.flipScreenVertically();
+ WiFi.begin(ssid,password);
+ while(WiFi.status()!=WL_CONNECTED){delay(500);}
+ client.setServer(mqtt_server,mqtt_port);
+ client.setCallback(callback);
+}
+unsigned long last=0;
+void loop(){
+ if(!client.connected()) reconnect();
+ client.loop();
+ if(millis()-last>2000){
+   last=millis();
+   float t=dht.readTemperature();
+   float h=dht.readHumidity();
+   int m=digitalRead(MOTION_PIN);
+   if(!isnan(t)) client.publish("itpro/dht/temperature", String(t).c_str());
+   if(!isnan(h)) client.publish("itpro/dht/humidity", String(h).c_str());
+   client.publish("itpro/motion", String(m).c_str());
+   display.clear();
+   display.drawString(0,0,"Temp:"+String(t));
+   display.drawString(0,16,"Hum :"+String(h));
+   display.drawString(0,32,"Motion:"+String(m));
+   display.display();
+ }
+}
