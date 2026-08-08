@@ -1,0 +1,95 @@
+
+#include <Wire.h> 
+#include "SSD1306.h"
+#include "DHT.h"
+#define DHTPIN D3  //define input pin for DHT Data
+#define DHTTYPE DHT22 //Define DHT Sensor model
+DHT dht(DHTPIN, DHTTYPE); //define Instance for DHT.h Library
+SSD1306  display(0x3c, 4, 5); //define Instance for  OLED1306 Library
+
+
+ 
+int localHum = 0;
+int localTemp = 0;
+
+void setup() {
+
+    display.init();
+    display.flipScreenVertically();
+   
+
+}
+
+void loop() {
+  display.clear();
+  getDHT(); //read DHT 22 Sensor data
+  drawDHT(); //show DHT sensor data on OLED
+  drawLM35(); //Read and show LM35 sensor On OLED
+  display.display(); //Display all in OLED
+  
+  
+}
+//read DHT 22 Sensor data
+void getDHT()  
+{
+
+  localTemp = dht.readTemperature(); //READ DHT22 Tepmerature
+  localHum = dht.readHumidity();   //READ DHT22 Humidity
+}
+/***************************************************
+* Draw DHT22 Page
+****************************************************/
+void drawDHT() 
+{
+  int x=0;
+  int y=0;
+  display.setFont(ArialMT_Plain_10);
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  display.drawString(43 + x, y, "DHT22");
+
+  display.setFont(ArialMT_Plain_10);
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  display.drawString(0 + x, 5 + y, "Hum");
+   
+  display.setFont(ArialMT_Plain_24);
+  String humdht22 = String(localHum);
+  display.drawString(0 + x, 15 + y, humdht22 + "%");
+  
+
+  display.setFont(ArialMT_Plain_10);
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  display.drawString(95 + x, 5 + y, "Temp");
+
+  display.setFont(ArialMT_Plain_24);
+  String tempdht22 = String(localTemp) ;
+  display.drawString(70 + x, 15 + y, tempdht22+ "°C");
+  
+}
+void drawLM35() {
+  int x=0;
+  int y=0;
+  // read the value from LM35.
+  // read 10 values for averaging.
+  int val = 0;
+  for(int i = 0; i < 10; i++) {
+      val += analogRead(A0);   //summation for A0 reads
+      delay(200);
+  }
+
+  // convert to temp:
+  // temp value is in 0-1023 range
+  // LM35 outputs 10mV/degree C. ie, 1 Volt => 100 degrees C
+  // So Temp = (avg_val/1023)*3.3 Volts * 100 degrees/Volt
+  int templm35 = val*33/1023;
+ 
+ 
+
+  String temprature(templm35);  // convert to string
+    
+  display.setFont(ArialMT_Plain_10);
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  display.drawString(34 + x, 37+y, "LM35 Temp");
+  display.setFont(ArialMT_Plain_16);
+  display.drawString(46,48,temprature+"°C" );
+}
+
