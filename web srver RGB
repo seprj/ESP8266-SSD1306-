@@ -1,157 +1,678 @@
-#include "SSD1306.h"
-#include <ESP8266WiFi.h>
-#include <ESP8266WebServer.h>
-#include <ESP8266mDNS.h>
-#include <Adafruit_NeoPixel.h>
-#include <WS2812FX.h>
-#include "index.h"
-#include "index_css.h"
-#include "index_js.h"
-#include "Lesson_15css.h"
+// ======================================================
+// کتابخانه‌ها
+// ======================================================
 
-int PIN = 14;
-int NUM_LEDS =2;
-String RED ="255" ;
-String GREEN;
-String BLUE;
-String All; 
-String FX;
-String FXbox ;
-String Pixel_Number;
-uint8_t FXmode;
-int Speed = 200;
-int BRIGHTNESS =255;
-const char* username = "admin";
-const char* www_password = "admin";
+#include "SSD1306.h"              // کتابخانه نمایشگر OLED
+#include <ESP8266WiFi.h>          // برای اتصال ESP8266 به WiFi
+#include <ESP8266WebServer.h>     // برای ساخت Web Server روی ESP8266
+#include <ESP8266mDNS.h>          // برای دسترسی با نام دامنه محلی مثل esp8266.local
+#include <Adafruit_NeoPixel.h>    // کتابخانه کنترل LED های NeoPixel
+#include <WS2812FX.h>             // کتابخانه افکت‌های مختلف WS2812
+
+#include "index.h"                // کد HTML صفحه وب
+#include "index_css.h"            // کد CSS صفحه وب
+#include "index_js.h"             // کد JavaScript صفحه وب
+#include "Lesson_15css.h"         // فایل CSS مربوط به Lesson 15
 
 
+// ======================================================
+// تنظیمات LED
+// ======================================================
+
+int PIN = 14;                     // پایه DATA نوار WS2812
+                                  // GPIO14 روی NodeMCU معمولاً همان D5 است
+
+int NUM_LEDS = 2;                 // تعداد LED های نوار
+
+String RED = "255";               // مقدار اولیه رنگ قرمز
+String GREEN;                     // مقدار رنگ سبز
+String BLUE;                      // مقدار رنگ آبی
+
+String All;                       // مشخص می‌کند همه LED ها روشن شوند یا نه
+String FX;                        // مشخص می‌کند حالت افکت فعال است یا نه
+String FXbox;                     // شماره افکت انتخاب‌شده
+
+String Pixel_Number;              // شماره LED انتخاب‌شده
+
+uint8_t FXmode;                   // متغیر برای نگهداری شماره Mode افکت
+
+int Speed = 200;                  // سرعت افکت
+
+int BRIGHTNESS = 255;             // میزان روشنایی LED ها
 
 
-SSD1306  display(0x3c, 4, 5); //define Instance for  OLED1306 Library
+// ======================================================
+// نام کاربری و رمز عبور Web Server
+// ======================================================
 
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_LEDS, PIN, NEO_GRB + NEO_KHZ800);
-WS2812FX ws2812fx = WS2812FX(NUM_LEDS,PIN, NEO_GRB + NEO_KHZ800);
-const char *ssid = "itpro";
-const char *password = "12345678";
+const char* username = "admin";   // نام کاربری ورود به صفحه وب
 
-ESP8266WebServer server ( 80 );
+const char* www_password = "admin"; // رمز عبور ورود به صفحه وب
+
+
+// ======================================================
+// ساخت نمونه OLED
+// ======================================================
+
+// آدرس I2C نمایشگر 0x3C است
+// پایه SDA = GPIO4
+// پایه SCL = GPIO5
+
+SSD1306 display(0x3c, 4, 5);
+
+
+// ======================================================
+// ساخت نمونه NeoPixel
+// ======================================================
+
+// NUM_LEDS = تعداد LED
+// PIN = پایه DATA
+// NEO_GRB = ترتیب رنگ‌ها GRB
+// NEO_KHZ800 = فرکانس ارتباط WS2812 برابر 800KHz
+
+Adafruit_NeoPixel strip =
+  Adafruit_NeoPixel(
+    NUM_LEDS,
+    PIN,
+    NEO_GRB + NEO_KHZ800
+  );
+
+
+// ======================================================
+// ساخت نمونه WS2812FX
+// ======================================================
+
+// این شیء برای اجرای افکت‌های آماده روی LED استفاده می‌شود
+
+WS2812FX ws2812fx =
+  WS2812FX(
+    NUM_LEDS,
+    PIN,
+    NEO_GRB + NEO_KHZ800
+  );
+
+
+// ======================================================
+// مشخصات WiFi
+// ======================================================
+
+const char *ssid = "itpro";       // نام شبکه WiFi
+
+const char *password = "12345678"; // رمز WiFi
+
+
+// ======================================================
+// ساخت Web Server
+// ======================================================
+
+// عدد 80 یعنی Web Server روی پورت 80 اجرا می‌شود
+// بنابراین مرورگر با HTTP به ESP8266 وصل می‌شود
+
+ESP8266WebServer server(80);
+
+
+// ======================================================
+// SETUP
+// ======================================================
+
 void setup() {
-   
-   display.init();
-  display.flipScreenVertically();
-  
-  display.setFont(ArialMT_Plain_16);
-  display.setTextAlignment(TEXT_ALIGN_LEFT);
-  
-  pinMode ( 2, OUTPUT );
-  digitalWrite ( 2, 1 );
-    pinMode ( 16, OUTPUT );
-  digitalWrite ( 16, 1 );
-  
-  Serial.begin ( 115200 );
-  WiFi.disconnect();
- WiFi.begin ( ssid, password );
-while ( WiFi.status() != WL_CONNECTED ) {
-  digitalWrite ( 2, 0 );
-    delay ( 250 );
-    Serial.print ( "." );
-    digitalWrite ( 2, 1 );
-    delay ( 250 );
-  }
-//Connected signal
-String IP = WiFi.localIP().toString();
-display.drawString(0,0,"IP Address:\n"+IP);
-display.display();
-  
-server.begin();  //Start web server
-Serial.println ( "HTTP server started" );  
-server.on("/" ,Handle_Root);
-server.on("/RGB",Handle_RGB);
-server.on("/index.css",[](){ if(!server.authenticate(username, www_password))return server.requestAuthentication();server.send(200,"text/css",indexcss);});
-server.on("/Lesson15.css",[](){if(!server.authenticate(username, www_password))return server.requestAuthentication();server.send(200,"text/css",lesson15css);});
-server.on("/index.js",[](){if(!server.authenticate(username, www_password))return server.requestAuthentication();server.send(200,"aplication/javascript",indexjs);});
 
+  // ----------------------------------------------------
+  // راه‌اندازی OLED
+  // ----------------------------------------------------
+
+  display.init();                 // شروع به کار نمایشگر OLED
+
+  display.flipScreenVertically(); // چرخاندن تصویر نمایشگر به صورت عمودی
+
+
+  // انتخاب فونت OLED
+  display.setFont(ArialMT_Plain_16);
+
+  // قرار دادن متن از سمت چپ
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+
+
+  // ----------------------------------------------------
+  // تنظیم LED های داخلی ESP8266
+  // ----------------------------------------------------
+
+  pinMode(2, OUTPUT);             // GPIO2 را خروجی می‌کنیم
+
+  digitalWrite(2, 1);             // LED را خاموش/روشن اولیه می‌کنیم
+
+
+  pinMode(16, OUTPUT);            // GPIO16 را خروجی می‌کنیم
+
+  digitalWrite(16, 1);            // مقدار اولیه GPIO16
+
+
+  // ----------------------------------------------------
+  // شروع ارتباط Serial
+  // ----------------------------------------------------
+
+  Serial.begin(115200);           // سرعت ارتباط سریال 115200
+
+
+  // ----------------------------------------------------
+  // اتصال به WiFi
+  // ----------------------------------------------------
+
+  WiFi.disconnect();              // ابتدا اتصال قبلی WiFi را قطع می‌کنیم
+
+  WiFi.begin(ssid, password);     // اتصال به WiFi با SSID و Password
+
+
+  // تا زمانی که WiFi متصل نشده است
+  // داخل این حلقه باقی می‌مانیم
+
+  while (WiFi.status() != WL_CONNECTED) {
+
+    digitalWrite(2, 0);           // LED روشن
+
+    delay(250);                   // 250 میلی‌ثانیه صبر
+
+    Serial.print(".");            // روی Serial یک نقطه چاپ می‌کند
+
+    digitalWrite(2, 1);            // LED خاموش
+
+    delay(250);                   // دوباره 250 میلی‌ثانیه صبر
+  }
+
+
+  // ----------------------------------------------------
+  // WiFi متصل شده است
+  // ----------------------------------------------------
+
+  // آدرس IP که روتر به ESP8266 داده را می‌گیریم
+
+  String IP = WiFi.localIP().toString();
+
+
+  // نمایش IP روی OLED
+
+  display.drawString(
+    0,
+    0,
+    "IP Address:\n" + IP
+  );
+
+
+  // نمایش اطلاعات روی OLED
+
+  display.display();
+
+
+  // ----------------------------------------------------
+  // شروع Web Server
+  // ----------------------------------------------------
+
+  server.begin();
+
+  Serial.println("HTTP server started");
+
+
+  // ----------------------------------------------------
+  // تعریف مسیرهای Web Server
+  // ----------------------------------------------------
+
+  // وقتی کاربر آدرس اصلی را باز کند:
+  // http://IP/
+
+  // تابع Handle_Root اجرا می‌شود
+
+  server.on("/", Handle_Root);
+
+
+  // وقتی آدرس /RGB درخواست شود:
+  // تابع Handle_RGB اجرا می‌شود
+
+  server.on("/RGB", Handle_RGB);
+
+
+  // ----------------------------------------------------
+  // فایل CSS اصلی
+  // ----------------------------------------------------
+
+  server.on(
+    "/index.css",
+    {
+      if (!server.authenticate(username, www_password))
+        return server.requestAuthentication();
+
+      server.send(200, "text/css", indexcss);
+    }
+  );
+
+
+  // ----------------------------------------------------
+  // فایل CSS مربوط به Lesson 15
+  // ----------------------------------------------------
+
+  server.on(
+    "/Lesson15.css",
+    {
+      if (!server.authenticate(username, www_password))
+        return server.requestAuthentication();
+
+      server.send(200, "text/css", lesson15css);
+    }
+  );
+
+
+  // ----------------------------------------------------
+  // فایل JavaScript
+  // ----------------------------------------------------
+
+  server.on(
+    "/index.js",
+    {
+      if (!server.authenticate(username, www_password))
+        return server.requestAuthentication();
+
+      server.send(200, "application/javascript", indexjs);
+    }
+  );
 }
+
+
+// ======================================================
+// LOOP
+// ======================================================
 
 void loop() {
- server.handleClient();
+
+  // بررسی می‌کند آیا مرورگر درخواست جدیدی
+  // برای Web Server فرستاده است یا نه
+
+  server.handleClient();
+
+
+  // اجرای افکت WS2812
+
   ws2812fx.service();
-
 }
 
-void Handle_Root(){
 
-       if(!server.authenticate(username, www_password))
-      return server.requestAuthentication();
-  server.send(200,"text/html",index_page);
+// ======================================================
+// تابع Handle_Root
+// ======================================================
+
+// این تابع وقتی اجرا می‌شود که کاربر صفحه اصلی
+// Web Server را درخواست کند
+
+void Handle_Root() {
+
+  // ----------------------------------------------------
+  // بررسی Username و Password
+  // ----------------------------------------------------
+
+  // اگر کاربر احراز هویت نشده باشد
+
+  if (!server.authenticate(username, www_password))
+
+    // صفحه Login را نمایش بده
+
+    return server.requestAuthentication();
+
+
+  // ----------------------------------------------------
+  // ارسال صفحه HTML
+  // ----------------------------------------------------
+
+  // عدد 200 یعنی درخواست موفق بوده
+  // text/html یعنی اطلاعاتی که می‌فرستیم HTML است
+  // index_page محتوای HTML صفحه وب است
+
+  server.send(
+    200,
+    "text/html",
+    index_page
+  );
 }
-void Handle_RGB(){
-  
-       if(!server.authenticate(username, www_password))
-      return server.requestAuthentication();
-      
- RED = server.arg("Red");
- GREEN = server.arg("Green");
- BLUE = server.arg("Blue");
- Pixel_Number= server.arg("Pixel_Number");
- FX = server.arg("FX");
- All = server.arg("All");
- FXbox = server.arg("FXbox");
- BRIGHTNESS = server.arg("BRIGHTNESS").toInt();
-  Speed = server.arg("Speed").toInt();
+
+
+// ======================================================
+// تابع Handle_RGB
+// ======================================================
+
+// این تابع زمانی اجرا می‌شود که صفحه وب
+// درخواست /RGB را ارسال کند
+
+void Handle_RGB() {
+
+  // ----------------------------------------------------
+  // بررسی Username و Password
+  // ----------------------------------------------------
+
+  if (!server.authenticate(username, www_password))
+
+    return server.requestAuthentication();
+
+
+  // ----------------------------------------------------
+  // دریافت اطلاعات ارسال‌شده از HTML
+  // ----------------------------------------------------
+
+  // مقدار Red را از درخواست مرورگر می‌گیرد
+
+  RED = server.arg("Red");
+
+
+  // مقدار Green را می‌گیرد
+
+  GREEN = server.arg("Green");
+
+
+  // مقدار Blue را می‌گیرد
+
+  BLUE = server.arg("Blue");
+
+
+  // شماره LED انتخاب‌شده را می‌گیرد
+
+  Pixel_Number = server.arg("Pixel_Number");
+
+
+  // وضعیت افکت را می‌گیرد
+
+  FX = server.arg("FX");
+
+
+  // مشخص می‌کند همه LED ها انتخاب شده‌اند یا نه
+
+  All = server.arg("All");
+
+
+  // شماره افکت را می‌گیرد
+
+  FXbox = server.arg("FXbox");
+
+
+  // میزان روشنایی را دریافت می‌کند
+  // toInt() مقدار String را به عدد صحیح تبدیل می‌کند
+
+  BRIGHTNESS =
+    server.arg("BRIGHTNESS").toInt();
+
+
+  // سرعت افکت را دریافت می‌کند
+
+  Speed =
+    server.arg("Speed").toInt();
+
+
+  // ----------------------------------------------------
+  // تنظیم روشنایی NeoPixel
+  // ----------------------------------------------------
+
   strip.setBrightness(BRIGHTNESS);
-  strip.begin(); 
-  
-if (FX == "on"){ 
-  Handle_FX();
-}else{
-  ws2812fx.stop();
-  if (All=="on"){
-  for(uint16_t i=0;i< NUM_LEDS;i++){
-    strip.setPixelColor(i,RED.toInt(),GREEN.toInt(),BLUE.toInt());
-strip.show();
-delay(1);
+
+
+  // شروع کار NeoPixel
+
+  strip.begin();
+
+
+  // ----------------------------------------------------
+  // بررسی اینکه FX فعال شده یا نه
+  // ----------------------------------------------------
+
+  if (FX == "on") {
+
+    // اگر FX روشن باشد
+    // تابع Handle_FX را اجرا می‌کنیم
+
+    Handle_FX();
+
   }
- 
- display.clear();
-   display.drawString(0 , 0, "Red: "+RED);
-   display.drawString(0 , 17, "Green: "+GREEN);
-   display.drawString(0 , 33, "Blue: "+BLUE);
-    display.drawString(0 , 48, "All Pixels");
-    display.display();
-     
+  else {
 
-}else{
-   strip.setPixelColor(Pixel_Number.toInt(),RED.toInt(),GREEN.toInt(),BLUE.toInt());
+    // اگر FX خاموش باشد
+    // افکت قبلی را متوقف می‌کنیم
+
+    ws2812fx.stop();
 
 
-   
-   strip.show();
-   
-   display.clear();
-   display.drawString(0 , 0, "Red: "+RED);
-   display.drawString(0 , 17, "Green: "+GREEN);
-   display.drawString(0 , 33, "Blue: "+BLUE);
-    display.drawString(0 , 48, "Pixel Number: "+Pixel_Number);
-    display.display();
-   
+    // --------------------------------------------------
+    // بررسی اینکه همه LED ها انتخاب شده‌اند یا نه
+    // --------------------------------------------------
+
+    if (All == "on") {
+
+
+      // ------------------------------------------------
+      // حلقه برای تمام LED ها
+      // ------------------------------------------------
+
+      for (
+        uint16_t i = 0;
+        i < NUM_LEDS;
+        i++
+      ) {
+
+
+        // تنظیم رنگ LED شماره i
+
+        strip.setPixelColor(
+          i,
+          RED.toInt(),
+          GREEN.toInt(),
+          BLUE.toInt()
+        );
+
+
+        // ارسال اطلاعات رنگ به LED ها
+
+        strip.show();
+
+
+        // کمی صبر
+
+        delay(1);
+      }
+
+
+      // ------------------------------------------------
+      // نمایش اطلاعات روی OLED
+      // ------------------------------------------------
+
+      display.clear();
+
+
+      // نمایش مقدار قرمز
+
+      display.drawString(
+        0,
+        0,
+        "Red: " + RED
+      );
+
+
+      // نمایش مقدار سبز
+
+      display.drawString(
+        0,
+        17,
+        "Green: " + GREEN
+      );
+
+
+      // نمایش مقدار آبی
+
+      display.drawString(
+        0,
+        33,
+        "Blue: " + BLUE
+      );
+
+
+      // نمایش اینکه تمام Pixel ها انتخاب شده‌اند
+
+      display.drawString(
+        0,
+        48,
+        "All Pixels"
+      );
+
+
+      // ارسال اطلاعات به OLED
+
+      display.display();
+
+
     }
- server.send(204,"");
-}
+    else {
+
+      // ------------------------------------------------
+      // فقط یک LED را تغییر می‌دهیم
+      // ------------------------------------------------
+
+      strip.setPixelColor(
+        Pixel_Number.toInt(),
+        RED.toInt(),
+        GREEN.toInt(),
+        BLUE.toInt()
+      );
+
+
+      // ارسال رنگ به LED
+
+      strip.show();
+
+
+      // ------------------------------------------------
+      // نمایش اطلاعات روی OLED
+      // ------------------------------------------------
+
+      display.clear();
+
+
+      // مقدار Red
+
+      display.drawString(
+        0,
+        0,
+        "Red: " + RED
+      );
+
+
+      // مقدار Green
+
+      display.drawString(
+        0,
+        17,
+        "Green: " + GREEN
+      );
+
+
+      // مقدار Blue
+
+      display.drawString(
+        0,
+        33,
+        "Blue: " + BLUE
+      );
+
+
+      // شماره Pixel
+
+      display.drawString(
+        0,
+        48,
+        "Pixel Number: " + Pixel_Number
+      );
+
+
+      // نمایش اطلاعات روی OLED
+
+      display.display();
+    }
+
+
+    // --------------------------------------------------
+    // پاسخ به مرورگر
+    // --------------------------------------------------
+
+    // 204 یعنی درخواست انجام شده ولی
+    // محتوایی برای برگرداندن نداریم
+
+    server.send(204, "");
+  }
 }
 
-void Handle_FX(){
+
+// ======================================================
+// تابع Handle_FX
+// ======================================================
+
+// این تابع افکت‌های WS2812 را فعال می‌کند
+
+void Handle_FX() {
+
+
+  // ----------------------------------------------------
+  // راه‌اندازی WS2812FX
+  // ----------------------------------------------------
+
   ws2812fx.init();
+
+
+  // تنظیم روشنایی
+
   ws2812fx.setBrightness(BRIGHTNESS);
+
+
+  // تنظیم سرعت افکت
+
   ws2812fx.setSpeed(Speed);
-  ws2812fx.setColor(RED.toInt(),GREEN.toInt(),BLUE.toInt());
-  ws2812fx.setMode(FXbox.toInt());
+
+
+  // تنظیم رنگ افکت
+
+  ws2812fx.setColor(
+    RED.toInt(),
+    GREEN.toInt(),
+    BLUE.toInt()
+  );
+
+
+  // ----------------------------------------------------
+  // انتخاب نوع افکت
+  // ----------------------------------------------------
+
+  // FXbox شماره افکت است
+
+  ws2812fx.setMode(
+    FXbox.toInt()
+  );
+
+
+  // شروع اجرای افکت
+
   ws2812fx.start();
-  server.send(204,"");
-  
+
+
+  // ----------------------------------------------------
+  // ارسال پاسخ به مرورگر
+  // ----------------------------------------------------
+
+  server.send(204, "");
+
+
+  // ----------------------------------------------------
+  // نمایش FX Mode روی OLED
+  // ----------------------------------------------------
+
   display.clear();
-     display.drawString(32 , 22, "FX Mode");
-    display.display();
+
+
+  display.drawString(
+    32,
+    22,
+    "FX Mode"
+  );
+
+
+  display.display();
 }
-
-
